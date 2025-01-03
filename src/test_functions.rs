@@ -69,7 +69,6 @@ pub(crate) fn tester() {
         let cross = cross_product(&(v2 - &v1), &(v3 - &v1));
         let cross_norm = cross.l2_dist(&A1::zeros(3)).unwrap();
         let triangle_normal = cross.clone() / cross_norm;
-        // println!("triangle normal: {:?}", triangle_normal);
 
         let jacobian = cross.l2_dist(&A1::zeros(3)).unwrap();
         
