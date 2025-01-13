@@ -3,7 +3,7 @@ use libm::{atan2, exp, sin};
 use ndarray::{arr1, s, Axis, Zip};
 use ndarray_stats::DeviationExt;
 
-use crate::{integrals::{integrate_j1, integrate_j2, integrate_j3}, side_map_table::SIDE_TABLE, transforms::{affine_transform, duffy_transform}, A1, A2};
+use crate::{integrals::{integrate_j0, integrate_jx, integrate_jy}, side_map_table::SIDE_TABLE, transforms::{affine_transform, duffy_transform}, A1, A2};
 use crate::structures::{analytic_triangle::AnalyticTriangle, node::Node, projection_point::ProjectionPoint};
 use crate::utils::{compensated_summation, special_sum, get_theta_2, is_positively_oriented, rotate_surface_to_be_tangent, rotate_triangle_on_xy_plane};
 use super::integrals::{geometric_1, geometric_2, geometric_3, geometric_4, geometric_5, geometric_6, integrate_i0, integrate_ix, integrate_iy, integrate_ixx, integrate_iyy, integrate_ixy};
@@ -606,9 +606,9 @@ pub(crate) fn integrate_green_analytically(angle_signs: Vec<i8>, angle_bounds: V
         let sign_end = 1.0;
         // this makes phi + arccos(0) = 2pi
 
-        let j1_val = integrate_j1(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
-        let j2_val = integrate_j2(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
-        let j3_val = integrate_j3(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
+        let j1_val = integrate_j0(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
+        let j2_val = integrate_jx(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
+        let j3_val = integrate_jy(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
 
         match integral_type {
             0 => {
@@ -634,9 +634,9 @@ pub(crate) fn integrate_green_analytically(angle_signs: Vec<i8>, angle_bounds: V
             let d_norm_end = d_end.get_norm();
             let sign_end = angle_signs.get(2*k + 1).unwrap().to_owned() as f64; // 1.0 or -1.0
 
-            let j1_val = integrate_j1(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
-            let j2_val = integrate_j2(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
-            let j3_val = integrate_j3(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
+            let j1_val = integrate_j0(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
+            let j2_val = integrate_jx(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
+            let j3_val = integrate_jy(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
 
             match integral_type {
                 0 => {

@@ -189,7 +189,7 @@ fn integral_5(c: f64, d_norm: f64, radius_start: f64, radius_end: f64)  -> f64 {
 }
 
 // integrals for Greens function
-pub(crate) fn integrate_j1(phi_end: f64, phi_start: f64, c: f64, radius_end: f64, radius_start: f64, d_norm_end: f64, d_norm_start: f64, sign_end: f64, sign_start: f64) -> f64{
+pub(crate) fn integrate_j0(phi_end: f64, phi_start: f64, c: f64, radius_end: f64, radius_start: f64, d_norm_end: f64, d_norm_start: f64, sign_end: f64, sign_start: f64) -> f64{
     let mut angle_difference = phi_end - phi_start;
     let branch_check = check_for_branch_cut(phi_end, phi_start, (radius_start + radius_end) / 2.0 , d_norm_end, d_norm_start, sign_end, sign_start);
     if branch_check < 0.0 {
@@ -204,7 +204,7 @@ pub(crate) fn integrate_j1(phi_end: f64, phi_start: f64, c: f64, radius_end: f64
     value
 }
 
-pub(crate) fn integrate_j2(phi_end: f64, phi_start: f64, c: f64, radius_end: f64, radius_start: f64, d_norm_end: f64, d_norm_start: f64, sign_end: f64, sign_start: f64) -> f64{
+pub(crate) fn integrate_jx(phi_end: f64, phi_start: f64, c: f64, radius_end: f64, radius_start: f64, d_norm_end: f64, d_norm_start: f64, sign_end: f64, sign_start: f64) -> f64{
 
     let value = (d_norm_end*sin(phi_end) - d_norm_start*sin(phi_start)) * integral_j1(c, radius_start, radius_end) 
     + sign_end * cos(phi_end)* integral_j3(c, d_norm_end, radius_start, radius_end) 
@@ -212,7 +212,7 @@ pub(crate) fn integrate_j2(phi_end: f64, phi_start: f64, c: f64, radius_end: f64
     value
 }
 
-pub(crate) fn integrate_j3(phi_end: f64, phi_start: f64, c: f64, radius_end: f64, radius_start: f64, d_norm_end: f64, d_norm_start: f64, sign_end: f64, sign_start: f64) -> f64{
+pub(crate) fn integrate_jy(phi_end: f64, phi_start: f64, c: f64, radius_end: f64, radius_start: f64, d_norm_end: f64, d_norm_start: f64, sign_end: f64, sign_start: f64) -> f64{
 
     let value = - (d_norm_end*cos(phi_end) - d_norm_start*cos(phi_start)) * integral_j1(c, radius_start, radius_end) 
     + sign_end * sin(phi_end)* integral_j3(c, d_norm_end, radius_start, radius_end) 
