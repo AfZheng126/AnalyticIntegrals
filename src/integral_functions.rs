@@ -3,12 +3,17 @@ use libm::{atan2, exp, sin};
 use ndarray::{arr1, s, Axis, Zip};
 use ndarray_stats::DeviationExt;
 
-use crate::{side_map_table::SIDE_TABLE, transforms::{affine_transform, duffy_transform}, A1, A2};
+use crate::{integrals::{integrate_j1, integrate_j2, integrate_j3}, side_map_table::SIDE_TABLE, transforms::{affine_transform, duffy_transform}, A1, A2};
 use crate::structures::{analytic_triangle::AnalyticTriangle, node::Node, projection_point::ProjectionPoint};
 use crate::utils::{compensated_summation, special_sum, get_theta_2, is_positively_oriented, rotate_surface_to_be_tangent, rotate_triangle_on_xy_plane};
 use super::integrals::{geometric_1, geometric_2, geometric_3, geometric_4, geometric_5, geometric_6, integrate_i0, integrate_ix, integrate_iy, integrate_ixx, integrate_iyy, integrate_ixy};
 
-pub(crate) fn evaluate_integral_analytically_for_paper(x: &A1, normal: &A1, triangle: &A2, method: usize, integral_type: usize, _second_fundamental_form: &A2) -> (A1, A1, A2, f64) {
+// evaluate the integral analytically
+// for greens function, kernal type is 1
+// for normal derivative of greens function, kernal type is 2
+// integral types are what the polynomial is {0: 1, 1: x, 2: y}
+// second_fundamental_form is currently not used so when creating inputs for the function just use &A2::eye(2)
+pub(crate) fn evaluate_integral_analytically(x: &A1, normal: &A1, triangle: &A2, method: usize, kernal_type: usize, integral_type: usize, _second_fundamental_form: &A2) -> (A1, A1, A2, f64) {
     // first perform transformations and create analytic triangles
     // this transformation doesn't change the order of the vertices
     let (triangle, x, normal) = rotate_triangle_on_xy_plane(triangle, x, normal);
@@ -32,16 +37,21 @@ pub(crate) fn evaluate_integral_analytically_for_paper(x: &A1, normal: &A1, tria
     if analytic_triangle.contains_origin() {
         // println!("integrating starting at origin");
         let mut weights;
-        if integral_type == 0 {
-            weights = integrate_only_kernal(Vec::new(), Vec::new(), 0.0, analytic_triangle.get_critical_radius(0), c, &normal);
-        } else if integral_type == 1 {
-            weights = integrate_kernal_x(Vec::new(), Vec::new(), 0.0, analytic_triangle.get_critical_radius(0), c, &normal);
-        } else if integral_type == 2 {
-            weights = integrate_kernal_y(Vec::new(), Vec::new(), 0.0, analytic_triangle.get_critical_radius(0), c, &normal);
-        } else {  
-            panic!("integral type not supported")
+        if kernal_type == 0 {
+            if integral_type == 0 {
+                weights = integrate_only_kernal(Vec::new(), Vec::new(), 0.0, analytic_triangle.get_critical_radius(0), c, &normal);
+            } else if integral_type == 1 {
+                weights = integrate_kernal_x(Vec::new(), Vec::new(), 0.0, analytic_triangle.get_critical_radius(0), c, &normal);
+            } else if integral_type == 2 {
+                weights = integrate_kernal_y(Vec::new(), Vec::new(), 0.0, analytic_triangle.get_critical_radius(0), c, &normal);
+            } else {  
+                panic!("integral type not supported")
+            }
+        } else if kernal_type == 1 {
+            weights = integrate_green_analytically(Vec::new(), Vec::new(), 0.0, analytic_triangle.get_critical_radius(0), c, integral_type);
+        } else {
+            panic!("kernal type not supported")
         }
-
         values_to_sum.append(&mut weights);
     }
 
@@ -316,7 +326,6 @@ pub(crate) fn integrate_kernal_x(angle_signs: Vec<i8>, angle_bounds: Vec<&Projec
     integral_vals
 }
 
-
 pub(crate) fn integrate_kernal_y(angle_signs: Vec<i8>, angle_bounds: Vec<&ProjectionPoint>, radius_start: f64, radius_end: f64, c:f64, normal: &A1) -> Vec<f64> {
     let n = angle_signs.len();
 
@@ -424,7 +433,7 @@ pub(crate) fn integrate_kernal_with_duffy(triangle_normal: &A1, node: &Node, gau
     // calculate Kvals
     let mut k_vals = A2::zeros((number_of_nodes, number_of_nodes));
     Zip::from(&mut k_vals).and(gauss_legendre_x_nodes).and(gauss_legendre_y_nodes).for_each(|k, s1, s2| {
-        *k = calculate_kernal_with_duffy(*s1, *s2, &node, &triangle_normal, &mapping_matrix, max_omega, a1, a2);
+        *k = compute_kernal_with_duffy(*s1, *s2, &node, &triangle_normal, &mapping_matrix, max_omega, a1, a2);
     });
 
     // let mut l1_vals = A2::zeros((number_of_nodes, number_of_nodes));
@@ -460,7 +469,7 @@ pub(crate) fn integrate_kernal_with_duffy(triangle_normal: &A1, node: &Node, gau
 }
 
 // calculate kernal function using Duffy transform when the kernal is the normal derivative of the Green's function in 3D
-fn calculate_kernal_with_duffy(s1: f64, s2: f64, node: &Node, triangle_normal_vector: &A1, mapping_matrix: &A2, max_omega: f64, a1: f64, a2: f64) -> f64 {
+fn compute_kernal_with_duffy(s1: f64, s2: f64, node: &Node, triangle_normal_vector: &A1, mapping_matrix: &A2, max_omega: f64, a1: f64, a2: f64) -> f64 {
     // println!("duffy");
     // first map points back to original triangle
     let simplex_point = duffy_transform(arr1(&[s1,s2, 0.0]));
@@ -493,7 +502,6 @@ fn calculate_kernal_with_duffy(s1: f64, s2: f64, node: &Node, triangle_normal_ve
     let result = (&d.dot(&normal_vector) * s1) / (4.0*PI*((&d.mapv(|d| d.powi(2))).sum()).powf(1.5));
     result
 }
-
 
 // Geometric Method
 pub(crate) fn geometric_method_on_singular_integral(triangle: &A2, normal_x: &A1, second_fundamental_form: &A2, triangle_permutation_vector: Vec<usize>, summation_method: usize, integral_type: usize) -> f64 {
@@ -538,7 +546,6 @@ pub(crate) fn geometric_method_on_singular_integral(triangle: &A2, normal_x: &A1
     - val / 2.0
 }
 
-
 // integrate in radius and then in theta for the singular integrals using the second fundamental form
 pub(crate) fn geometric_integral(theta_2: f64, theta_end: f64, vertex_2_norm: f64, second_fundamental_form: &A2, method: usize) -> Vec<f64> {
 
@@ -574,4 +581,75 @@ pub(crate) fn geometric_integral(theta_2: f64, theta_end: f64, vertex_2_norm: f6
         panic!("method not available")
     }
     integral_values
+}
+
+
+// Analytic equations for Green function of Laplace in 3D
+pub(crate) fn integrate_green_analytically(angle_signs: Vec<i8>, angle_bounds: Vec<&ProjectionPoint>, radius_start: f64, radius_end: f64, c:f64, integral_type: usize) -> Vec<f64> {
+    let n = angle_signs.len();
+
+    // check that n is even
+    if (n % 2) != 0 {
+        panic!("number of boundaries is not even.")
+    }
+
+    let mut integral_vals = Vec::new();
+    if n == 0 {
+        // integrate from 0 to 2 pi
+        let phi_start = PI/2.;
+        let d_norm_start = 0.0;
+        let sign_start = -1.0;
+        // this makes phi - arccos(0) = 0
+
+        let phi_end = 3.*PI / 2.;
+        let d_norm_end = 0.0;
+        let sign_end = 1.0;
+        // this makes phi + arccos(0) = 2pi
+
+        let j1_val = integrate_j1(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
+        let j2_val = integrate_j2(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
+        let j3_val = integrate_j3(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
+
+        match integral_type {
+            0 => {
+                integral_vals.push(j1_val);
+            }, 1 => {
+                integral_vals.push(j2_val);
+            }, 2 => {
+                integral_vals.push(j3_val);
+            }, _ => {
+                panic!("integral type not supported for green currently")
+            }
+        }
+    } else {
+        let n2 = n / 2;
+        for k in 0..n2 {
+            let d_start = angle_bounds.get(2*k).unwrap().to_owned();
+            let phi_start = d_start.get_angle();
+            let d_norm_start = d_start.get_norm();
+            let sign_start = angle_signs.get(2*k).unwrap().to_owned() as f64; // 1.0 or -1.0
+
+            let d_end = angle_bounds.get(2*k + 1).unwrap().to_owned();
+            let phi_end = d_end.get_angle();
+            let d_norm_end = d_end.get_norm();
+            let sign_end = angle_signs.get(2*k + 1).unwrap().to_owned() as f64; // 1.0 or -1.0
+
+            let j1_val = integrate_j1(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
+            let j2_val = integrate_j2(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
+            let j3_val = integrate_j3(phi_end, phi_start, c, radius_end, radius_start, d_norm_end, d_norm_start, sign_end, sign_start);
+
+            match integral_type {
+                0 => {
+                    integral_vals.push(j1_val);
+                }, 1 => {
+                    integral_vals.push(j2_val);
+                }, 2 => {
+                    integral_vals.push(j3_val);
+                }, _ => {
+                    panic!("integral type not supported for green currently")
+                }
+            }
+        }
+    }
+    integral_vals
 }

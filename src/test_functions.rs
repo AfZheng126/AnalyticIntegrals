@@ -5,7 +5,7 @@ use ndarray::{concatenate, s, Axis};
 use ndarray_stats::DeviationExt;
 use rand::Rng;
 
-use crate::{integral_functions::{evaluate_integral_analytically_for_paper, geometric_method_on_singular_integral, integrate_kernal_with_duffy}, structures::node::Node, utils::{change_triangle_info_for_duffy_method, cross_product, get_gauss_legendre_nodes, meshgrid}, A1, A2};
+use crate::{integral_functions::{evaluate_integral_analytically, geometric_method_on_singular_integral, integrate_kernal_with_duffy}, structures::node::Node, utils::{change_triangle_info_for_duffy_method, cross_product, get_gauss_legendre_nodes, meshgrid}, A1, A2};
 
 pub(crate) fn tester() {
     //create_mesh();
@@ -198,7 +198,7 @@ pub(crate) fn analytic_tester() {
         let jacobian = cross.l2_dist(&A1::zeros(3)).unwrap();
         
         let mapping_matrix = triangle.clone();
-        let (triangle_permutation_vector, mut mapping_matrix) = change_triangle_info_for_duffy_method(mapping_matrix, &distance_matrix);
+        let (_triangle_permutation_vector, mut mapping_matrix) = change_triangle_info_for_duffy_method(mapping_matrix, &distance_matrix);
         
         let inverse = A2::from_shape_vec((3, 3), vec![-1., -1., 1., 0., 1., 0., 1., 0., 0.]).unwrap();
         mapping_matrix = mapping_matrix.t().dot(&inverse);
@@ -218,7 +218,7 @@ pub(crate) fn analytic_tester() {
         let duffy_time = time.elapsed();
 
         let time = Instant::now();
-        let (new_x, new_normal, new_triangle, analytic_val) = evaluate_integral_analytically_for_paper(&x, &normal, &triangle, 0, 2, &A2::eye(2));
+        let (new_x, new_normal, new_triangle, analytic_val) = evaluate_integral_analytically(&x, &normal, &triangle, 0, 0, 2, &A2::eye(2));
         let analytic_time = time.elapsed();
         // let (new_x, new_normal, new_triangle, avx) = evaluate_integral_analytically_for_paper(&x, &normal, &triangle, 0, 1, &A2::eye(2));
         // let (new_x, new_normal, new_triangle, avy) = evaluate_integral_analytically_for_paper(&x, &normal, &triangle, 0, 2, &A2::eye(2));

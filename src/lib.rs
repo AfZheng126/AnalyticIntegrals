@@ -1,4 +1,4 @@
-use integral_functions::{geometric_method_on_singular_integral, integrate_kernal_with_duffy};
+use integral_functions::{evaluate_integral_analytically, geometric_method_on_singular_integral, integrate_kernal_with_duffy};
 use ndarray::{concatenate, s, Array1, Array2, Axis};
 use ndarray_stats::DeviationExt;
 use structures::node::Node;
@@ -85,9 +85,9 @@ pub extern "C" fn duffy_integration_method(triangle_raw: *const f64, normal_x_ra
     }
 }
 
-// Analytic method to integrate near-singular integral
+// Analytic method to integrate near-singular integral or when the kernal is the greens function
 #[no_mangle]
-pub extern "C" fn analytic_integration_method(triangle_raw: *const f64, normal_x_raw: *const f64, x_raw: *const f64, permutation_list_raw: *const usize, integral_type: usize) -> f64 {
+pub extern "C" fn analytic_integration_method(triangle_raw: *const f64, normal_x_raw: *const f64, x_raw: *const f64, _permutation_list_raw: *const usize, kernal_type: usize, integral_type: usize) -> f64 {
 
     unsafe {
         // create normal vector
@@ -97,40 +97,16 @@ pub extern "C" fn analytic_integration_method(triangle_raw: *const f64, normal_x
         // create x
         let x_vec = Vec::from_raw_parts(x_raw as *mut f64, 3, 3);
         let x = A1::from_vec(x_vec);
-        let node_for_x = Node::new_from_array(999, &x, &normal_x);
         
         // create triangle
         let triangle_vec = Vec::from_raw_parts(triangle_raw as *mut f64, 9, 9);
         let triangle = A2::from_shape_vec((3, 3), triangle_vec).unwrap();
 
-        let (mapping_matrix, distance_matrix, triangle_normal, jacobian) = turn_matrix_into_correct_information(&triangle, x);
+        let (_new_x, _new_normal, _new_triangle, analytic_val) = evaluate_integral_analytically(&x, &normal_x, &triangle, 0, kernal_type, integral_type, &A2::eye(2));
 
-        // generate Gauss Legendre Nodes
-        const NUMBER_OF_GAUSS_LEGENDRE_NODES:usize = 50;
-        let (nodes, weights) = get_gauss_legendre_nodes(NUMBER_OF_GAUSS_LEGENDRE_NODES);
-        let (gauss_legendre_x_nodes, gauss_legendre_y_nodes) = meshgrid(nodes.clone(), nodes);
-        let weights = weights.t().dot(&weights);
-
-        let (w, w2, w3) = integrate_kernal_with_duffy(&triangle_normal, &node_for_x, 
-            &gauss_legendre_x_nodes, &gauss_legendre_y_nodes, &weights, NUMBER_OF_GAUSS_LEGENDRE_NODES, 
-            &mapping_matrix, &distance_matrix, 0.0, 0.0);
-
-        // create permutation vector
-        let _triangle_permutation_vector = Vec::from_raw_parts(permutation_list_raw as *mut usize, 3, 3);
-
-        if integral_type == 0 {
-            jacobian * w
-        } else if integral_type == 1 {
-            jacobian * w2
-        } else if integral_type == 2 {
-            jacobian * w3
-        } else {
-            panic!("integral type is not implemented")
-        }
+        analytic_val
     }
 }
-
-// Analytic method to integrate Green's function
 
 
 fn turn_matrix_into_correct_information(triangle: &A2, x: A1) -> (A2, A2, A1, f64) {
