@@ -133,6 +133,7 @@ fn turn_matrix_into_correct_information(triangle: &A2, x: A1) -> (A2, A2, A1, f6
 }
 
 pub fn run_tests() {
-    test_functions::tester();
-    test_functions::analytic_tester();
+    // test_functions::tester();
+    // test_functions::analytic_tester();
+    test_functions::divergence_test();
 }
