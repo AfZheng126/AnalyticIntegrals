@@ -34,7 +34,7 @@ Create a new file `mex_wrapper.c`:
 ```
 #include "mex.h"
 
-// Declare teh Rust function signature
+// Declare the Rust function signature
 extern double function_name(double a, double b);
 
 // The MEX function interface
