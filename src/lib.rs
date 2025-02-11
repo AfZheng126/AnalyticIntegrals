@@ -13,7 +13,7 @@ extern crate clap;
 
 mod test_functions;
 mod utils;
-mod integral_functions;
+pub mod integral_functions;
 mod integrals;
 mod structures;
 mod side_map_table;
@@ -133,7 +133,6 @@ fn turn_matrix_into_correct_information(triangle: &A2, x: A1) -> (A2, A2, A1, f6
 }
 
 pub fn run_tests() {
-    // test_functions::tester();
-    // test_functions::analytic_tester();
-    test_functions::divergence_test();
+    test_functions::tester();
+    test_functions::analytic_tester();
 }
