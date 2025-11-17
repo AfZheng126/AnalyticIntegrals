@@ -1,4 +1,10 @@
-# Temp
+# Overview of the repository
+
+All the code is written in `src`, with `analytic_integrals.rs`, `green_integrals`, `quadratic_surface_approximation.rs` having the main integral evaluation functions for near singular K, G, and singular K respectively. 
+These files also have the algorithm for finding the bounds of integration. Code for the specific integrals $I_0, I_x, I_y, \ldots$ are in `src/integrals.rs`.  Some examples for calculating the integral over the triangles are in `src/lib/test_functions.rs`, which is also the code used to generate the data in the paper. 
+
+
+# Using the Rust code in other languages
 
 ## Steps to Create the Rust Function Callable from MATLAB
 
