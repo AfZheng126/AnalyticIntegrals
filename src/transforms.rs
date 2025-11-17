@@ -1,5 +1,4 @@
 use ndarray::arr1;
-
 use super::{A1, A2};
 
 // map square to unit simplex shifted up by 1 in the z-direction

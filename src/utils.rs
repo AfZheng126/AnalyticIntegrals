@@ -81,8 +81,12 @@ pub(crate) fn get_gauss_legendre_nodes(number_of_nodes: usize) -> (A1, A2) {
     let contents;
     if number_of_nodes == 7 {
         contents = fs::read_to_string("gauss_legendre_data/gauss_legendre_nodes_7.txt").expect("Gauss Nodes for N = 7 is missing.");
+    } else if number_of_nodes == 8 {
+        contents = fs::read_to_string("gauss_legendre_data/gauss_legendre_nodes_8.txt").expect("Gauss Nodes for N = 8 is missing.");
     } else if number_of_nodes == 10 {
         contents = fs::read_to_string("gauss_legendre_data/gauss_legendre_nodes_10.txt").expect("Gauss Nodes for N = 10 is missing.");
+    } else if number_of_nodes == 16 {
+        contents = fs::read_to_string("gauss_legendre_data/gauss_legendre_nodes_16.txt").expect("Gauss Nodes for N = 16 is missing.");
     } else if number_of_nodes == 50 {
         contents = fs::read_to_string("gauss_legendre_data/gauss_legendre_nodes_50.txt").expect("Gauss Nodes for N = 50 is missing.");
     } else if number_of_nodes == 200 {
@@ -260,7 +264,11 @@ pub(crate) fn is_positively_oriented(mut triangle: A2) -> (A2, Vec<usize>) {
 
 }
 
-pub(crate) fn rotate_triangle_on_xy_plane(triangle: &A2, x: &A1, normal_x: &A1) -> (A2, A1, A1) {
+// triangle: each row is a point
+// rotates so that x is on the z-axis and the triangle is on the xy-plane
+#[allow(dead_code)]
+pub(crate) fn rotate_triangle_onto_xy_plane(triangle: &A2, x: &A1, normal_x: &A1) -> (A2, A1, A1, A2, A1) {
+    // println!("triangle: {:?}\nx: {:?}\nnormal: {:?}", triangle, x, normal_x);
     // first get the normal vector of the triangle
     let v1 = A1::from_vec(vec![triangle[[0, 0]], triangle[[0, 1]], triangle[[0, 2]]]);
     let v2 = A1::from_vec(vec![triangle[[1, 0]], triangle[[1, 1]], triangle[[1, 2]]]);
@@ -273,42 +281,66 @@ pub(crate) fn rotate_triangle_on_xy_plane(triangle: &A2, x: &A1, normal_x: &A1) 
     let mut normal = cross_product(&vector1, &vector2);
     let n = normal.l2_dist(&zero).unwrap();
     normal = normal / n;
+    // println!("triangle normal: {:?}, n: {:?}", normal, n);
 
     // find the rotation matrix
     let xy_normal = A1::from_vec(vec![0., 0., 1.]);
     let v = cross_product(&normal, &xy_normal);
     let s = v.l2_dist(&zero).expect("unable to compute l2 norm");
+    // println!("s: {:?}", s);
     let rotation_matrix;
-    // println!("s: {:?}", &s);
-    if s < 1e-12 {
+    if s < 1e-15 {
         // triangle is already parallel to XY plane
         rotation_matrix = A2::eye(3);
     } else {
         let c = normal.dot(&xy_normal);
         rotation_matrix = A2::eye(3) + skew_symmetric(&v) + skew_symmetric(&v).dot(&skew_symmetric(&v)) * (1.0 - c)/s.powi(2);
     }
+    // println!("rotation matrix: {:?}", rotation_matrix);
     let mut new_x = rotation_matrix.dot(x);
     let new_normal_x = rotation_matrix.dot(normal_x); // normal is only changed by rotation, not translation
-    let mut new_triangle = rotation_matrix.dot(&triangle.t()).t().to_owned();
-    // println!("new triangle: {:?}", &new_triangle);
+    let mut new_triangle = rotation_matrix.dot(&triangle.t()).t().to_owned(); // each row is a point, so first transpose the triangle, then transpose the result to be consistent
+    // println!("\nnew x: {:?}\nnew normal: {:?}\nnew triangle: {:?}", new_x, new_normal_x, new_triangle);
+
+    let mut preimage_of_origin = A1::zeros(3);  // rotations doesn't shift the origin currently
+
     // now translate triangle to XY-axis
     let z_val = new_triangle[[0, 2]];
     new_triangle.slice_mut(s![..,2]).assign(&A1::zeros(3));
     new_x[2] = new_x[2] - z_val;
+    preimage_of_origin[2] = preimage_of_origin[2] + z_val;
+    // println!("\nnew x: {:?}\nnew normal: {:?}\nnew triangle: {:?}", new_x, new_normal_x, new_triangle);
     
     // now translate x to z-axis
     let shift_matrix = A2::from_shape_vec((3, 3), vec![new_x[0], new_x[1], 0.0, new_x[0], new_x[1], 0.0, new_x[0], new_x[1], 0.0]).unwrap();
     new_triangle = new_triangle - shift_matrix;
+    preimage_of_origin[0] = preimage_of_origin[0] + new_x[0];
+    preimage_of_origin[1] = preimage_of_origin[1] + new_x[1];
+
     new_x[0] = 0.0;
     new_x[1] = 0.0;
 
-    (new_triangle, new_x, new_normal_x)
+    (new_triangle, new_x, new_normal_x, rotation_matrix, preimage_of_origin)
 }
 
 
 // assuming that the target is V1
-pub(crate) fn rotate_surface_to_be_tangent(triangle: &A2, normal_x: &A1) -> (A2, Vec<usize>) {
-    // find the rotation matrix
+// first rotates so that nx = [0, 0, 1]
+// then translates so that x=V1 is the origin
+// then projects triangle to XY-plane
+// then rotates so that V1V2 edge is on X-axis
+// returns the rotated triangle and the changed permutations of the nodes to make the triangle positively oriented
+// the permutation is only in the nodes, so the coordinate variables were not switched, only rotated
+// also returns the two rotational matrices as we need to invert them to get the correct second fundamental form.
+pub(crate) fn rotate_surface_to_be_tangent(triangle: &A2, normal_x: &A1) -> (A2, Vec<usize>, A2) {
+    // translate so that V1 is the origin (which also makes it the smallest vertex in norm)
+    let translation_x = triangle[[0, 0]];
+    let translation_y = triangle[[0, 1]];
+    let translation_z = triangle[[0, 2]];
+    let shift_matrix = A2::from_shape_vec((3, 3), vec![translation_x, translation_y, translation_z, translation_x, translation_y, translation_z, translation_x, translation_y, translation_z]).unwrap();
+    let mut new_triangle = triangle - shift_matrix;
+
+    // find the rotation matrix that makes n(x) equal to [0, 0, 1]
     let zero = A1::zeros(3);
     let final_normal = A1::from_vec(vec![0., 0., 1.]);
     let mut v = cross_product(&normal_x, &final_normal);
@@ -322,8 +354,9 @@ pub(crate) fn rotate_surface_to_be_tangent(triangle: &A2, normal_x: &A1) -> (A2,
     let v_as_2d_array = v.into_shape((1, 3)).unwrap();
     let rotation_matrix = cos(angle) * A2::eye(3) + (1.0 - cos(angle)) * (v_as_2d_array.t().dot(&v_as_2d_array)) + sin(angle) * skew_v;
 
-    let temp = triangle.t().to_owned();
-    let mut new_triangle = rotation_matrix.dot(&temp).t().to_owned();
+    let temp = new_triangle.t().to_owned();
+    new_triangle = rotation_matrix.dot(&temp).t().to_owned();
+    
     // now project points onto the XY-plane
     new_triangle[[0, 2]] = 0.0;
     new_triangle[[1, 2]] = 0.0;
@@ -338,16 +371,18 @@ pub(crate) fn rotate_surface_to_be_tangent(triangle: &A2, normal_x: &A1) -> (A2,
     let theta = atan2(new_triangle[[1, 1]], new_triangle[[1, 0]]);
     let second_rotation_matrix = A2::from_shape_vec((3, 3), vec![cos(-theta), - sin(-theta), 0.0, sin(-theta), cos(-theta), 0.0, 0.0, 0.0, 1.0]).unwrap();
     new_triangle = (second_rotation_matrix.dot(&(new_triangle.t()))).t().to_owned();
+    let smaller_rotation_matrix = A2::from_shape_vec((2, 2), vec![cos(-theta), - sin(-theta), sin(-theta), cos(-theta)]).unwrap();
 
-    (new_triangle, permutation_vector)
+    (new_triangle, permutation_vector, smaller_rotation_matrix)
 }
 
-
+#[allow(dead_code)]
 fn skew_symmetric(v: &A1) -> A2 {
     A2::from_shape_vec((3, 3), vec![0.0, -v[2], v[1], v[2], 0.0, -v[0], -v[1], v[0], 0.0]).expect("couldn't create matrix")
 }
 
 // get interior angle using cosine law
+#[allow(dead_code)]
 pub(crate) fn get_theta_2(triangle: &A2) -> f64 {
     let v1 = triangle.slice(s![0,..]).to_owned();
     let v2 = triangle.slice(s![1,..]).to_owned();
@@ -362,37 +397,53 @@ pub(crate) fn get_theta_2(triangle: &A2) -> f64 {
     theta2
 }
 
-pub(crate) fn special_sum(v: &Vec<f64>) -> f64 {
-    let mut positive_values = Vec::new();
-    let mut negative_values = Vec::new();
-    for k in v {
-        if *k < 0.0 {
-            negative_values.push(-k);
-        } else {
-            positive_values.push(k)
-        }
-    }
-    let mut pos_val = 0.0;
-    for k in positive_values {
-        pos_val += k;
-    }
-    let mut neg_val = 0.0;
-    for k in negative_values {
-        neg_val += k;
-    }
-    //println!("positive: {:?}, negative: {:?}", &pos_val, &neg_val);
+// barycentric interpolation
+pub(crate) fn get_intepolation_constants(triangle: &A2) -> A2 {
+    let a = triangle[[1, 1]] - triangle[[2, 1]]; // P_2y - P_3y
+    let b = triangle[[0, 0]] - triangle[[2, 0]]; // P_1x - P_3x
+    let c = triangle[[2, 0]] - triangle[[1, 0]]; // P_3x - P_2x
+    let d = triangle[[0, 1]] - triangle[[2, 1]]; // P_1y - P_3y
 
-    pos_val - neg_val
+    let v = a*b + c*d;
+    if !v.is_normal() {
+        println!("triangle: {:?}\nv:{:?}", &triangle, &v);
+        panic!("cannot get interpolation constants");
+    }
+    
+    let w1_const = (-a*triangle[[2, 0]] - c*triangle[[2, 1]]) / v;
+    let w1_x = a / v;
+    let w1_y = c / v;
+
+    let w2_const = (d * triangle[[0, 0]] - b * triangle[[0, 1]]) / v;
+    let w2_x = -d / v;
+    let w2_y = b / v;
+
+    let w3_const = (-(triangle[[0, 1]] - triangle[[1, 1]])*triangle[[1, 0]] - (triangle[[1, 0]] - triangle[[0, 0]])*triangle[[1, 1]]) / v;
+    let w3_x = (triangle[[0, 1]] - triangle[[1, 1]]) / v;
+    let w3_y = (triangle[[1, 0]] - triangle[[0, 0]]) / v;
+
+    A2::from_shape_vec((3, 3), vec![w1_const, w1_x, w1_y, w2_const, w2_x, w2_y, w3_const, w3_x, w3_y]).unwrap()
 }
 
-pub(crate) fn compensated_summation(v: &Vec<f64>) -> f64 {
-    let mut sum = 0.0;
-    let mut error = 0.0;
-    for k in v {
-        let y = *k - error;
-        let t = sum + y;
-        error = (t - sum) - y;
-        sum = t;
-    }
-    sum
+pub(crate) fn turn_matrix_into_correct_information(triangle: &A2, x: A1) -> (A2, A2, A1, f64) {
+    let v1 = triangle.slice(s![0, ..]).to_owned();
+    let v2 = triangle.slice(s![1, ..]).to_owned();
+    let v3 = triangle.slice(s![2, ..]).to_owned();
+    let d1 = (&x - &v1).into_shape((1, 3)).unwrap();
+    let d2 = (&x - &v2).into_shape((1, 3)).unwrap();
+    let d3 = (&x - &v3).into_shape((1, 3)).unwrap();
+
+    let distance_matrix = concatenate(Axis(0), &[d1.view(), d2.view(), d3.view()]).unwrap();
+    let cross = cross_product(&(v2 - &v1), &(v3 - &v1));
+    let cross_norm = cross.l2_dist(&A1::zeros(3)).unwrap();
+    let triangle_normal = cross.clone() / cross_norm;
+
+    let jacobian = cross.l2_dist(&A1::zeros(3)).unwrap();
+    let mapping_matrix = triangle.clone();
+    let (_triangle_permutation_vector, mut mapping_matrix) = change_triangle_info_for_duffy_method(mapping_matrix, &distance_matrix);
+    
+    let inverse = A2::from_shape_vec((3, 3), vec![-1., -1., 1., 0., 1., 0., 1., 0., 0.]).unwrap();
+    mapping_matrix = mapping_matrix.t().dot(&inverse);
+
+    (mapping_matrix, distance_matrix, triangle_normal, jacobian)
 }
