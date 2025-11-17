@@ -79,8 +79,8 @@ pub extern "C" fn analytic_integration_method(triangle_raw: *const f64, normal_x
     }
 }
 
-// Analytic method to integrate near-singular integral K(x, y)l(y) over a triangle
-// K(x, y) = 1/4pi (x-y) * n(x) / |x-y|^3 
+// Analytic method to integrate integral G(x, y)l(y) over a triangle
+// G(x, y) = -1/4pi 1/ |x-y| 
 // l(y) is the barycentric interpolation polynomials of a 3 point quadrature on a triangle
 // current integral types:
 // 0: l(y) = 1, 1: l(y) = y_1, 2: l(y) = y_2, where y = (y_1, y_2) in R^2. 
