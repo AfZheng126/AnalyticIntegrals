@@ -415,11 +415,12 @@ fn integral_j2(c: f64, d_norm: f64, radius_start: f64, radius_end: f64) -> f64 {
 
 fn taylor_expansion_for_atanh(r: f64, c: f64, d: f64) -> f64 {
     let val = sqrt((r.powi(2) - d.powi(2)) / (r.powi(2) + c.powi(2)));
-    if val == 1.0 {
-        return 0.0;
-    } else {
-        return d * atanh(val);
-    }
+    // if val == 1.0 {
+    //     return 0.0;
+    // } else {
+    //     return d * atanh(val);
+    // }
+    return d * (val + val.powi(3) / 3. + val.powi(5) / 5. );
 }
 
 fn integral_j3(c: f64,  d_norm: f64, radius_start: f64, radius_end: f64) -> f64 {
